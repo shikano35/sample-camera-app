@@ -1,5 +1,6 @@
 import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
+import 'package:gal/gal.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -8,9 +9,24 @@ class HomePage extends StatefulWidget {
   State<HomePage> createState() => _HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
   List<CameraDescription> cameras = [];
   CameraController? cameraController;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (cameraController == null ||
+        cameraController?.value.isInitialized == false) {
+      return;
+    }
+
+    if (state == AppLifecycleState.inactive) {
+      cameraController?.dispose();
+    } else if (state == AppLifecycleState.resumed) {
+      _setupCameraController();
+    }
+  }
 
   @override
   void initState() {
@@ -39,7 +55,10 @@ class _HomePageState extends State<HomePage> {
               child: CameraPreview(cameraController!),
             ),
             IconButton(
-              onPressed: () {},
+              onPressed: () async {
+                XFile picture = await cameraController!.takePicture();
+                Gal.putImage(picture.path);
+              },
               iconSize: 100,
               icon: const Icon(Icons.camera, color: Colors.red),
             ),
@@ -55,13 +74,19 @@ class _HomePageState extends State<HomePage> {
       setState(() {
         cameras = _cameras;
         cameraController = CameraController(
-          _cameras.first,
+          _cameras.last,
           ResolutionPreset.high,
         );
       });
-      cameraController?.initialize().then((_) {
-        setState(() {});
-      });
+      cameraController
+          ?.initialize()
+          .then((_) {
+            if (!mounted) {
+              return;
+            }
+            setState(() {});
+          })
+          .catchError((Object e) => print(e));
     }
   }
 }
